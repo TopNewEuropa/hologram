@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Edson Neiva – Holograma</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@200;300;400&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    :root { --gold:#FFD700; --gold-glow:rgba(255,215,0,0.4); }
+    html, body { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Raleway',sans-serif; }
+
+    #camera-bg { position:fixed; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+    #overlay   { position:fixed; inset:0; background:rgba(0,0,0,0.20); z-index:1; }
+    #particles { position:fixed; inset:0; pointer-events:none; z-index:2; }
+
+    .corner { position:fixed; width:36px; height:36px; z-index:3; opacity:.5; }
+    .corner--tl { top:16px; left:16px;    border-top:2px solid var(--gold); border-left:2px solid var(--gold); }
+    .corner--tr { top:16px; right:16px;   border-top:2px solid var(--gold); border-right:2px solid var(--gold); }
+    .corner--bl { bottom:16px; left:16px;  border-bottom:2px solid var(--gold); border-left:2px solid var(--gold); }
+    .corner--br { bottom:16px; right:16px; border-bottom:2px solid var(--gold); border-right:2px solid var(--gold); }
+
+    #scene {
+      position:fixed; inset:0; z-index:2;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:flex-end;
+      padding-bottom:4vh;
+    }
+
+    #hologram-wrap {
+      position:relative;
+      width:min(520px, 96vw);
+      flex-shrink:0;
+      display:flex; justify-content:center;
+    }
+
+    /* Canvas shows Edson with transparent background */
+    #holo-canvas {
+      width:100%; height:auto; display:block;
+      filter: drop-shadow(0 0 5px rgba(255,215,0,0.22));
+      animation: holoFlicker 8s infinite;
+    }
+
+    /* Hidden video - pixel source only */
+    #holo-video { display:none; }
+
+    @keyframes holoFlicker {
+      0%,100%{opacity:1;} 5%{opacity:.93;} 6%{opacity:1;} 51%{opacity:.9;} 52%{opacity:1;}
+    }
+
+    #ground-glow {
+      width:min(320px,72vw); height:14px; border-radius:50%;
+      background:radial-gradient(ellipse at center,rgba(255,215,0,.38) 0%,transparent 70%);
+      margin-top:-4px; flex-shrink:0;
+      animation:glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse{0%,100%{opacity:.6;transform:scaleX(1);}50%{opacity:1;transform:scaleX(1.08);}}
+
+    #info-card { margin-top:10px; text-align:center; flex-shrink:0; }
+    .name {
+      font-family:'Cinzel',serif; font-weight:900;
+      font-size:clamp(1.3rem,5vw,1.9rem); color:var(--gold);
+      letter-spacing:.12em; text-transform:uppercase;
+      text-shadow:0 0 8px var(--gold-glow),0 0 20px var(--gold-glow);
+    }
+    .tagline { margin-top:4px; font-size:clamp(.65rem,2.4vw,.82rem); font-weight:200; letter-spacing:.35em; color:rgba(255,215,0,.6); text-transform:uppercase; }
+    .divider { width:min(240px,55vw); height:1px; background:linear-gradient(90deg,transparent,var(--gold),transparent); margin:10px auto; opacity:.4; }
+
+    #buttons { display:flex; gap:12px; margin-top:4px; opacity:0; transform:translateY(20px); transition:opacity .8s ease,transform .8s ease; flex-shrink:0; }
+    #buttons.visible { opacity:1; transform:translateY(0); }
+    .btn {
+      display:flex; align-items:center; gap:7px; padding:10px 20px; border-radius:4px;
+      font-family:'Cinzel',serif; font-size:clamp(.6rem,2.3vw,.74rem); font-weight:700;
+      letter-spacing:.1em; text-decoration:none; text-transform:uppercase; cursor:pointer;
+      border:1.5px solid var(--gold); background:rgba(255,215,0,.08); color:var(--gold);
+      box-shadow:0 0 12px rgba(255,215,0,.2); transition:all .25s;
+    }
+    .btn:hover { box-shadow:0 0 22px rgba(255,215,0,.4); background:rgba(255,215,0,.14); }
+    .btn:active { transform:scale(.96); }
+    .btn-whatsapp { color:#4dff91; border-color:#25d366; background:rgba(37,211,102,.1); box-shadow:0 0 12px rgba(37,211,102,.18); }
+    .btn-whatsapp:hover { box-shadow:0 0 22px rgba(37,211,102,.4); }
+
+    /* Permission screen */
+    #permission-screen {
+      position:fixed; inset:0; background:#000; z-index:100;
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:16px; padding:28px 20px;
+      text-align:center; cursor:pointer;
+    }
+    .ps-logo { font-family:'Cinzel',serif; font-weight:900; font-size:clamp(1.3rem,6vw,1.9rem); color:var(--gold); letter-spacing:.18em; text-shadow:0 0 20px var(--gold-glow); }
+    .ps-sub  { font-size:clamp(.6rem,2.4vw,.75rem); color:rgba(255,215,0,.5); letter-spacing:.3em; text-transform:uppercase; }
+    #qr-wrapper { position:relative; padding:8px; background:#000; border-radius:12px; display:inline-block; }
+    #qr-wrapper::before {
+      content:''; position:absolute; inset:-3px; border-radius:14px;
+      background:conic-gradient(from 0deg,transparent 0%,var(--gold) 25%,transparent 50%,var(--gold) 75%,transparent 100%);
+      animation:spinBorder 3s linear infinite; z-index:-1;
+    }
+    @keyframes spinBorder{to{transform:rotate(360deg);}}
+    #qr-code img, #qr-code canvas { display:block; border-radius:6px; }
+    #qr-scanline {
+      position:absolute; left:8px; right:8px; height:3px;
+      background:linear-gradient(90deg,transparent,rgba(255,215,0,.9),transparent);
+      border-radius:2px; box-shadow:0 0 8px var(--gold-glow);
+      animation:scanMove 2.2s ease-in-out infinite; pointer-events:none;
+    }
+    @keyframes scanMove{0%{top:8px;opacity:0;}8%{opacity:1;}92%{opacity:1;}100%{top:calc(100% - 11px);opacity:0;}}
+    .ps-hint { font-size:clamp(.58rem,2.1vw,.7rem); color:rgba(255,215,0,.4); letter-spacing:.14em; text-transform:uppercase; line-height:1.8; }
+    .ps-hint strong { color:rgba(255,215,0,.8); }
+    #tap-hint {
+      font-family:'Cinzel',serif; font-weight:700; font-size:clamp(.68rem,2.6vw,.82rem);
+      color:var(--gold); letter-spacing:.22em; text-transform:uppercase;
+      animation:pulseTap 2s ease-in-out infinite;
+    }
+    @keyframes pulseTap{0%,100%{opacity:.45;transform:scale(1);}50%{opacity:1;transform:scale(1.04);}}
+    #permission-screen.hidden { opacity:0; pointer-events:none; transition:opacity .7s; }
+  </style>
+</head>
+<body>
+
+<div id="permission-screen">
+  <div class="ps-logo">EDSON NEIVA</div>
+  <div class="ps-sub">Top New Europa</div>
+  <div id="qr-wrapper">
+    <div id="qr-code"></div>
+    <div id="qr-scanline"></div>
+  </div>
+  <div class="ps-hint"><strong>Partilha este QR Code</strong><br>para abrir o holograma</div>
+  <div id="tap-hint">✦ Toque aqui para activar ✦</div>
+</div>
+
+<video id="camera-bg" autoplay playsinline muted></video>
+<div id="overlay"></div>
+<canvas id="particles"></canvas>
+
+<div class="corner corner--tl"></div>
+<div class="corner corner--tr"></div>
+<div class="corner corner--bl"></div>
+<div class="corner corner--br"></div>
+
+<div id="scene">
+  <div id="hologram-wrap">
+    <canvas id="holo-canvas"></canvas>
+    <video id="holo-video" playsinline muted preload="auto">
+      <source src="edson_video.mp4" type="video/mp4"/>
+    </video>
+  </div>
+  <div id="ground-glow"></div>
+  <div id="info-card">
+    <div class="name">Edson Neiva</div>
+    <div class="tagline">Top New Europa</div>
+  </div>
+  <div class="divider"></div>
+  <div id="buttons">
+    <a class="btn btn-site" href="https://topneweuropa.com/" target="_blank" rel="noopener">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      Website
+    </a>
+    <a class="btn btn-whatsapp" href="https://wa.me/351918705970" target="_blank" rel="noopener">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
+      </svg>
+      WhatsApp
+    </a>
+  </div>
+</div>
+
+<script>
+// QR Code
+window.addEventListener('load', () => {
+  new QRCode(document.getElementById('qr-code'), {
+    text: 'https://topneweuropa.github.io/hologram/',
+    width: 180, height: 180,
+    colorDark: '#B8860B', colorLight: '#000000',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+});
+
+// Particles
+const pC = document.getElementById('particles'), pX = pC.getContext('2d');
+let pts = [];
+function rP(){ pC.width=innerWidth; pC.height=innerHeight; }
+rP(); addEventListener('resize', rP);
+(function aP(){
+  pX.clearRect(0,0,pC.width,pC.height);
+  if(Math.random()<.22) pts.push({x:pC.width*(.2+Math.random()*.6),y:pC.height*.9,vx:(Math.random()-.5)*.5,vy:-(0.4+Math.random()*.9),life:1,decay:.006+Math.random()*.008,r:1+Math.random()*2});
+  pts=pts.filter(p=>p.life>0);
+  pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;pX.beginPath();pX.arc(p.x,p.y,p.r,0,Math.PI*2);pX.fillStyle=`rgba(255,215,0,${p.life*.7})`;pX.shadowBlur=6;pX.shadowColor=`rgba(255,200,0,${p.life*.5})`;pX.fill();});
+  requestAnimationFrame(aP);
+})();
+
+// ── Canvas white-background removal ─────────────────────────
+// Reads every frame of the video and removes white/near-white pixels
+const hv  = document.getElementById('holo-video');
+const hc  = document.getElementById('holo-canvas');
+const hx  = hc.getContext('2d', { willReadFrequently: true });
+let   running = false;
+
+function renderLoop() {
+  if (!running) return;
+
+  const vw = hv.videoWidth, vh = hv.videoHeight;
+  if (vw === 0) { requestAnimationFrame(renderLoop); return; }
+
+  // Match canvas to video resolution
+  if (hc.width !== vw) { hc.width = vw; hc.height = vh; }
+
+  // Draw current video frame to canvas
+  hx.drawImage(hv, 0, 0, vw, vh);
+
+  // Process pixels — remove white background
+  const frame = hx.getImageData(0, 0, vw, vh);
+  const d     = frame.data;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i+1], b = d[i+2];
+    // A pixel is "background white" if all 3 channels are bright
+    if (r > 200 && g > 200 && b > 200) {
+      // Smooth edge: pixels between 200-240 fade gradually
+      const brightness = Math.min(r, g, b);
+      const alpha = brightness > 230
+        ? 0                                            // fully transparent
+        : Math.round((1 - (brightness - 200) / 30) * 255); // soft edge
+      d[i+3] = alpha;
+    }
+  }
+
+  hx.putImageData(frame, 0, 0);
+  requestAnimationFrame(renderLoop);
+}
+
+// ── Activate on tap ─────────────────────────────────────────
+const ps = document.getElementById('permission-screen');
+const cb = document.getElementById('camera-bg');
+const bt = document.getElementById('buttons');
+
+ps.addEventListener('click', async () => {
+
+  // Start camera
+  try {
+    const s = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+    cb.srcObject = s; await cb.play();
+  } catch(e){ console.warn('Camera:', e); }
+
+  // Hide permission screen
+  ps.classList.add('hidden');
+  setTimeout(() => ps.style.display='none', 800);
+
+  // Remove muted → audio plays
+  hv.muted = false;
+  try {
+    await hv.play();
+  } catch(e) {
+    hv.muted = true;
+    await hv.play();
+    setTimeout(() => { hv.muted = false; }, 100);
+  }
+
+  // Start canvas rendering
+  running = true;
+  renderLoop();
+
+  // Show buttons near end
+  hv.addEventListener('timeupdate', () => {
+    if (hv.duration && (hv.duration - hv.currentTime) <= 3)
+      bt.classList.add('visible');
+  });
+  setTimeout(() => bt.classList.add('visible'), 17000);
+});
+</script>
+</body>
+</html>
